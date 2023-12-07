@@ -88,7 +88,7 @@ jobs:
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'Build'
-          security-result-attributes: '{ "scanner": "Veracode", "applicationName": "App-DevOps-Azure-POC", "securityToolId": "1db0945c87cb7d10e4220f2d0ebb35b6" }'
+          security-result-attributes: '{ "scanner": "Veracode", "applicationName": "App-DevOps-Azure-POC", "securityToolId": "8c31e510c307f910e630706dc0013119" }'
           
       # -  name: ServiceNow Change Approval
       #    uses: ServiceNow/servicenow-devops-change@main
