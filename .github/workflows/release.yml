@@ -1,0 +1,125 @@
+name: Release
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    # Running your workflow when a pull request merges
+    # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#running-your-workflow-when-a-pull-request-merges-1
+    #if: github.event.pull_request.merged == true
+    name: Build
+    runs-on: ubuntu-latest
+    steps:           
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+  # This workflow contains a job to build and submit pipeline scan, you will need to customize the build process accordingly and make sure the artifact you build is used as the file input to the pipeline scan file parameter
+#   scan:
+#     name: Veracode Static Analysis
+#     needs: build
+#     # The type of runner that the job will run on
+#     permissions:
+#       contents: read # for actions/checkout to fetch code
+#       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+#       actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+#     runs-on: ubuntu-latest
+#     steps:
+
+#       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it and copies all sources into ZIP file for submitting for analysis. Replace this section with your applications build steps
+#       - uses: actions/checkout@v3
+#         with:
+#           repository: ''
+
+#       - name: Build with Maven
+#         run: mvn -B package --file pom.xml
+
+#       - uses: actions/upload-artifact@v1
+#         with:
+#           name: my-artifact
+#           path: target/DevOps-Test-1.39.0-SNAPSHOT.jar          
+
+#       # download the Veracode Static Analysis Pipeline scan jar
+#       - run: curl --silent --show-error --fail -O https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
+#       - run: unzip -o pipeline-scan-LATEST.zip
+
+#       - uses: actions/setup-java@v3
+#         with:
+#           java-version: 8
+#           distribution: 'temurin'
+#       - run: java -jar pipeline-scan.jar --veracode_api_id "${{secrets.VERACODE_API_ID}}" --veracode_api_key "${{secrets.VERACODE_API_KEY}}" --fail_on_severity="Very High, High" --file target/DevOps-Test-1.39.0-SNAPSHOT.jar
+#         continue-on-error: true
+        
+#       - name: Convert pipeline scan output to SARIF format
+#         id: convert
+#         uses: veracode/veracode-pipeline-scan-results-to-sarif@ff08ae5b45d5384cb4679932f184c013d34da9be
+#         with:
+#           pipeline-results-json: results.json
+#           output-results-sarif: veracode-results.sarif
+#           source-base-path-1: "^com/veracode:src/main/java/com/veracode"
+#           source-base-path-2: "^WEB-INF:src/main/webapp/WEB-INF"
+#           finding-rule-level: "3:1:0"
+
+#       - uses: github/codeql-action/upload-sarif@v2
+#         with:
+#           # Path to SARIF file relative to the root of the repository
+#           sarif_file: veracode-results.sarif
+
+#       - name: Veracode Upload And Scan
+#         uses: veracode/veracode-uploadandscan-action@0.2.6
+#         with:
+#           appname: 'PetStoreAPI-Github'
+#           createprofile: false
+#           filepath: 'target/DevOps-Test-1.39.0-SNAPSHOT.jar'
+# #           version: ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+#           vid: '${{ secrets.VERACODE_API_ID }}'
+#           vkey: '${{ secrets.VERACODE_API_KEY }}'
+#           deleteincompletescan: 1
+#           scantimeout: 20
+          
+
+      - name: ServiceNow DevOps Security Results
+        uses: ServiceNow/servicenow-devops-security-result@main
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Build'
+          security-result-attributes: '{ "scanner": "Veracode", "applicationName": "App-DevOps-Azure-POC", "securityToolId": "1db0945c87cb7d10e4220f2d0ebb35b6" }'
+          
+      # -  name: ServiceNow Change Approval
+      #    uses: ServiceNow/servicenow-devops-change@main
+      #    id: create
+      #    with:
+      #     devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+      #     devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+      #     instance-url: ${{ secrets.SN_INSTANCE_URL }}
+      #     tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+      #     context-github: ${{ toJSON(github) }}
+      #     job-name: 'ServiceNow Change Approval'
+      #     change-request: '{"setCloseCode":"true","attributes":{"short_description":"Automated Software Deployment","assignment_group":"a715cd759f2002002920bde8132e7018","description":"Automated Software Deployment.","implementation_plan":"Software update is tested and results can be found in Test Summaries Tab; When the change is approved the implementation happens automated by the CICD pipeline within the change planned start and end time window.","backout_plan":"When software fails in production, the previous software release will be re-deployed.","test_plan":"Testing if the software was successfully deployed"}}'
+      #     interval: '100'
+      #     timeout: '3600'
+         
+  changeApproval:
+    needs: build
+    name: ServiceNow Change Approval
+    runs-on: ubuntu-latest
+    steps:     
+      - name: ServiceNow Change Approval
+        uses: ServiceNow/servicenow-devops-change@main
+        id: create
+        with:
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow Change Approval'
+          change-request: '{"setCloseCode":"true","attributes":{"short_description":"Automated Software Deployment","assignment_group":"a715cd759f2002002920bde8132e7018","description":"Automated Software Deployment.","implementation_plan":"Software update is tested and results can be found in Test Summaries Tab; When the change is approved the implementation happens automated by the CICD pipeline within the change planned start and end time window.","backout_plan":"When software fails in production, the previous software release will be re-deployed.","test_plan":"Testing if the software was successfully deployed"}}'
+          interval: '100'
+          timeout: '3600'
